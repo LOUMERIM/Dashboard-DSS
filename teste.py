@@ -48,3 +48,14 @@ gdf = gdf.merge(continent_treatment_percentage, left_on='CONTINENT', right_on='C
 
 # Exibir os dados no Streamlit
 st.write(gdf)
+
+import json
+import geopandas as gpd
+import plotly.express as px
+
+@st.cache_data
+def load_geojson(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+geojson_data = load_geojson("World_Continents_simplified.geojson")

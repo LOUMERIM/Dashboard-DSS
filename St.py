@@ -71,9 +71,18 @@ for continent in continents:
     treatment_percentage['Continent'] = continent
     continent_treatment_percentage = pd.concat([continent_treatment_percentage, treatment_percentage], ignore_index=True)
 
-# Carregar o arquivo SHP
-shapefile_path = "D:/ATVS PROGRAMACAO/DSS/Hand's-On/Geodados/World_Continents.shp"
-gdf = gpd.read_file(shapefile_path)
+@st.cache_data
+def load_shapefile():
+    return gpd.read_file("D:/ATVS PROGRAMACAO/DSS/Hand's-On/Geodados/World_Continents.shp")
+
+gdf = load_shapefile()
+mapeamento = {
+    "North America": "America",
+    "South America": "America",
+    "Antarctica": "Outros",
+    # Adicione outras correções
+}
+continent_treatment_percentage["Continent"] = continent_treatment_percentage["Continent"].replace(mapeamento)
 
 # Mesclar os dados de tratamento com os polígonos dos continentes
 gdf = gdf.merge(continent_treatment_percentage, left_on='CONTINENT', right_on='Continent')
@@ -82,17 +91,12 @@ gdf = gdf.merge(continent_treatment_percentage, left_on='CONTINENT', right_on='C
 continent_treatment_percentage['Treatment'] = continent_treatment_percentage['Treatment'].map({1: 'Procurou Tratamento', 0: 'Não Procurou Tratamento'})
 
 # Criar o mapa de calor
-fig = px.choropleth(gdf, geojson=gdf.geometry, locations=gdf.index, color='Percentage',
+'''fig = px.choropleth(gdf, geojson=gdf.geometry, locations=gdf.index, color='Percentage',
                     hover_name='Continent', animation_frame='Treatment', 
-                    title='Porcentagem de funcionários que procuraram tratamento por continente')
+                    title='Porcentagem de funcionários que procuraram tratamento por continente')'''
 
 fig.update_geos(fitbounds="locations", visible=False)
 st.plotly_chart(fig)
-
-# Correlação entre carga de trabalho e problemas de saúde mental
-workload_col = 'Se você tem um problema de saúde mental, sente que isso interfere no seu trabalho ao ser tratado de forma eficaz?'
-correlation = df_processed[[target_col, workload_col]].corr().iloc[0, 1]
-st.subheader(f"Correlação entre carga de trabalho e problemas de saúde mental: {correlation:.2f}")
 
 # Impacto da cultura organizacional na busca por tratamento
 culture_col = 'Você acha que discutir um distúrbio de saúde mental com empregadores anteriores teria consequências negativas?'
@@ -100,9 +104,21 @@ culture_impact = df_processed[[treatment_col, culture_col]].corr().iloc[0, 1]
 st.subheader(f"Impacto da cultura organizacional na busca por tratamento: {culture_impact:.2f}")
 
 # Nível de conscientização sobre os benefícios de saúde mental oferecidos pela empresa
-#awareness_col = 'Você conhece as opções de saúde mental disponíveis sob a cobertura de saúde do seu empregador?'
-#awareness_percentage = df_processed[awareness_col].value_counts(normalize=True) * 100
-#st.subheader(f"Nível de conscientização sobre os benefícios de saúde mental oferecidos pela empresa: {awareness_percentage[1]:.2f}%")
+awareness_col = 'Você conhece as opções de saúde mental disponíveis sob a cobertura de saúde do seu empregador?'
+awareness_mapping = {
+    'Não sabe': 0,
+    'Não': -1,
+    'Sim': 2
+}
+df_processed[awareness_col] = df_processed[awareness_col].map(awareness_mapping)
+awareness_percentage = df_processed[awareness_col].value_counts(normalize=True) * 100
+
+# Gráfico de Colunas
+fig = px.bar(awareness_percentage, x=awareness_percentage.index, y=awareness_percentage.values,
+             labels={'x': 'Conhece os Benefícios', 'y': 'Porcentagem'},
+             title='Nível de Conscientização sobre os Benefícios de Saúde Mental Oferecidos pela Empresa')
+
+st.plotly_chart(fig)
 
 st.header("Relatório de Classificação")
 st.text(classification_report(targ_test, randfor_targ_predicted))
@@ -157,7 +173,6 @@ X_train, X_test, y_train, y_test = train_test_split(relevant_features, target, t
 
 st.header("Demonstração de uso do modelo com um dado novo")
 st.write("Por favor, preencha o questionário abaixo para prever se você tem um distúrbio de saúde mental.")
-
 
 
     ###########################################################################
