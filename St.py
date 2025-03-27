@@ -24,7 +24,7 @@ url = 'https://drive.google.com/uc?id=19KHp0jH5v8fq_Kj8t6ybKNgriQyARfA5'
 output = 'DB-SaudeMental-Tech_processed.csv'
 gdown.download(url, output, quiet=False)
 df_processed = pd.read_csv(output)
-
+df_raw=pd.read_csv('df_raw (4).csv')
 #######################################################################
 #Random Forest
 #######################################################################
@@ -44,61 +44,52 @@ randfor_targ_predicted = randfor_trained.predict(feat_test)
 #################################################
 
 
-# Percentual de trabalhadores com problemas de saúde mental
-mental_health_issues = df_processed[target_col].value_counts(normalize=True) * 100
-mental_health_issues.index = mental_health_issues.index.map({2: 'Sim', 1: 'Não sabe', -1: 'Não'})
-fig = px.pie(values=mental_health_issues, names=mental_health_issues.index, title='Percentual de trabalhadores com problemas de saúde mental')
-st.plotly_chart(fig)
-st.write("No gráfico acima, é possível observar que mais de 40% dos trabalhadores possuem problemas de saúde mental, o que reflete uma realidade preocupante e mostra como essa questão afeta uma parte significativa da força de trabalho.")
 
-# Porcentagem de funcionários que procuraram tratamento
-
+# Coluna de tratamento no DataFrame df_processed
 treatment_col = 'Você já procurou tratamento para um problema de saúde mental de um profissional de saúde mental?'
-treatment_percentage = df_processed[treatment_col].value_counts(normalize=True) * 100
-st.subheader(f"Porcentagem de funcionários que procuraram tratamento: {treatment_percentage[1]:.2f}%")
 
-# Agregar os dados por continente
+# Lista de continentes
 continents = ['Africa', 'America', 'Asia', 'Europe', 'Oceania', 'Outros']
 continent_cols = [f'Continente que trabalha_{continent}' for continent in continents]
 
+# Criar DataFrame para armazenar porcentagens de tratamento por continente
 continent_treatment_percentage = pd.DataFrame(columns=['Continent', 'Treatment', 'Percentage'])
 
+# Calcular porcentagem de tratamento por continente
 for continent in continents:
     continent_col = f'Continente que trabalha_{continent}'
-    treatment_percentage = df_processed[df_processed[continent_col] == 1][treatment_col].value_counts(normalize=True) * 100
-    treatment_percentage = treatment_percentage.reset_index()
-    treatment_percentage.columns = ['Treatment', 'Percentage']
-    treatment_percentage['Continent'] = continent
-    continent_treatment_percentage = pd.concat([continent_treatment_percentage, treatment_percentage], ignore_index=True)
+    if continent_col in df_processed.columns:
+        treatment_percentage = df_processed[df_processed[continent_col] == 1][treatment_col].value_counts(normalize=True) * 100
+        treatment_percentage = treatment_percentage.reset_index()
+        treatment_percentage.columns = ['Treatment', 'Percentage']
+        treatment_percentage['Continent'] = continent
+        continent_treatment_percentage = pd.concat([continent_treatment_percentage, treatment_percentage], ignore_index=True)
 
-@st.cache_data
-def load_shapefile():
-    return gpd.read_file("D:/ATVS PROGRAMACAO/DSS/Hand's-On/Geodados/World_Continents.shp")
-
-gdf = load_shapefile()
-mapeamento = {
-    "North America": "America",
-    "South America": "America",
-    "Antarctica": "Outros",
-    # Adicione outras correções
-}
-continent_treatment_percentage["Continent"] = continent_treatment_percentage["Continent"].replace(mapeamento)
+# Carregar o shapefile dos continentes
+shapefile_path = "World_Continents.shp"
+gdf = gpd.read_file(shapefile_path)
 
 # Mesclar os dados de tratamento com os polígonos dos continentes
-gdf = gdf.merge(continent_treatment_percentage, left_on='CONTINENT', right_on='Continent')
+gdf = gdf.merge(continent_treatment_percentage, left_on='CONTINENT', right_on='Continent', how='left')
 
-# Mapear os valores de tratamento
-continent_treatment_percentage['Treatment'] = continent_treatment_percentage['Treatment'].map({1: 'Procurou Tratamento', 0: 'Não Procurou Tratamento'})
+# Criar o mapa cloropleth
+fig = px.choropleth(
+    gdf,
+    geojson=gdf.geometry,
+    locations=gdf.index,
+    color='Percentage',
+    hover_name='Continent',
+    animation_frame='Treatment',  # Animação por tipo de tratamento
+    title='Porcentagem de funcionários que procuraram tratamento por continente'
+)
 
-# Criar o mapa de calor
-'''fig = px.choropleth(gdf, geojson=gdf.geometry, locations=gdf.index, color='Percentage',
-                    hover_name='Continent', animation_frame='Treatment', 
-                    title='Porcentagem de funcionários que procuraram tratamento por continente')'''
-
+# Ajustar o layout do mapa
 fig.update_geos(fitbounds="locations", visible=False)
+
+# Exibir o mapa no Streamlit
 st.plotly_chart(fig)
 
-# Impacto da cultura organizacional na busca por tratamento
+'''# Impacto da cultura organizacional na busca por tratamento
 culture_col = 'Você acha que discutir um distúrbio de saúde mental com empregadores anteriores teria consequências negativas?'
 culture_impact = df_processed[[treatment_col, culture_col]].corr().iloc[0, 1]
 st.subheader(f"Impacto da cultura organizacional na busca por tratamento: {culture_impact:.2f}")
@@ -118,7 +109,7 @@ fig = px.bar(awareness_percentage, x=awareness_percentage.index, y=awareness_per
              labels={'x': 'Conhece os Benefícios', 'y': 'Porcentagem'},
              title='Nível de Conscientização sobre os Benefícios de Saúde Mental Oferecidos pela Empresa')
 
-st.plotly_chart(fig)
+st.plotly_chart(fig)'''
 
 st.header("Relatório de Classificação")
 st.text(classification_report(targ_test, randfor_targ_predicted))
